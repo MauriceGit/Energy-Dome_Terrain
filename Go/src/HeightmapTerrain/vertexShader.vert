@@ -34,7 +34,7 @@ void main() {
     //normal = normalize(cross(vertical, horizontal));
 
 
-    float height = texture(heightmapTextureMerged, vertUV).r;
+    float height = texture(heightmapTextureOriginal, vertUV).r;
     vec4 tmpPos = modelMat * vec4(vertPos + vec3(0,height * 0.6 - 0.3,0),1);
     pos = tmpPos.xyz;
 

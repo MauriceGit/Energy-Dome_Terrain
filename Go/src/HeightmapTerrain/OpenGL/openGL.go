@@ -1,9 +1,12 @@
 package opengl
 
 import (
-    //"github.com/go-gl/mathgl/mgl32"
+    . "HeightmapTerrain/Image"
+    "github.com/go-gl/mathgl/mgl32"
     "github.com/go-gl/gl/v4.5-core/gl"
     "strings"
+    "image"
+    "image/draw"
     "fmt"
     "bytes"
     "os"
@@ -13,7 +16,10 @@ import (
 const (
 )
 
-
+type ImageTexture struct {
+    TextureHandle uint32
+    TextureSize   mgl32.Vec2
+}
 
 
 
@@ -152,6 +158,32 @@ func CreateTexture(tex *uint32, width, height, internalFormat int32, format, int
     gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.TexImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, internalType, nil);
+}
+
+func CreateImageTexture(imageName string) ImageTexture {
+
+    var imageTexture ImageTexture
+
+    img, err := LoadImage(imageName)
+    if err != nil {
+        fmt.Printf("Image load failed: %v.\n", err)
+    }
+
+    rgbaImg := image.NewRGBA(img.Img.Bounds())
+    draw.Draw(rgbaImg, rgbaImg.Bounds(), img.Img, image.Pt(0, 0), draw.Src)
+
+    gl.GenTextures(1, &imageTexture.TextureHandle);
+    gl.BindTexture(gl.TEXTURE_2D, imageTexture.TextureHandle);
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, int32(img.Img.Bounds().Max.X), int32(img.Img.Bounds().Max.Y), 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(rgbaImg.Pix));
+
+    imageTexture.TextureSize = mgl32.Vec2{float32(img.Img.Bounds().Max.X), float32(img.Img.Bounds().Max.Y)}
+
+    return imageTexture
+
 }
 
 func CreateFboWithExistingTextures(fbo, colorTex, depthTex *uint32, texType uint32) {

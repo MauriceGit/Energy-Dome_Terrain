@@ -35,7 +35,11 @@ var g_farPlane  = float32(2000.0)
 
 var g_viewMatrix          mgl32.Mat4
 
-var g_light Object
+//var g_light   Object
+var g_terrain Object
+var g_heightmapTextureOriginal ImageTexture
+var g_heightmapTexture900m     ImageTexture
+var g_heightmapTextureMerged   ImageTexture
 
 
 var g_timeSum float32 = 0.0
@@ -102,28 +106,45 @@ func renderObject(shader uint32, obj Object) {
     // Model transformations are now encoded per object directly before rendering it!
     defineModelMatrix(shader, obj.Pos, obj.Scale)
 
-    gl.BindVertexArray(obj.Geo.VertexObject)
+    gl.BindVertexArray(obj.Geo.VertexBuffer)
+    gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, obj.Geo.IndexBuffer)
+
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("polygonMode\x00")), int32(g_fillMode))
 
     gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("color\x00")), 1, &obj.Color[0])
-    gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("light\x00")), 1, &g_light.Pos[0])
+
+    lightPos := mgl32.Vec3{60,80,0}
+
+    gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("light\x00")), 1, &lightPos[0])
     var isLighti int32 = 0
     if obj.IsLight {
         isLighti = 1
     }
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("isLight\x00")), isLighti)
 
-    gl.DrawArrays(gl.TRIANGLES, 0, obj.Geo.VertexCount)
+    gl.ActiveTexture(gl.TEXTURE0)
+    gl.BindTexture(gl.TEXTURE_2D, g_heightmapTextureOriginal.TextureHandle)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("heightmapTextureOriginal\x00")), 0)
 
-    gl.BindVertexArray(0)
+    gl.ActiveTexture(gl.TEXTURE0+1)
+    gl.BindTexture(gl.TEXTURE_2D, g_heightmapTextureMerged.TextureHandle)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("heightmapTextureMerged\x00")), 1)
 
+    gl.ActiveTexture(gl.TEXTURE0+2)
+    gl.BindTexture(gl.TEXTURE_2D, g_heightmapTexture900m.TextureHandle)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("heightmapTexture900m\x00")), 2)
+
+    textureSize := g_heightmapTextureMerged.TextureSize
+    gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("textureSize\x00")), 1, &textureSize[0])
+
+    gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
 }
 
 func renderEverything(shader uint32) {
 
     gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-    gl.Enable(gl.DEPTH_TEST)
     // Nice blueish background
-    gl.ClearColor(135.0/255.,206.0/255.,235.0/255., 1.0)
+    gl.ClearColor(0,0,0,1)
 
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.Viewport(0, 0, g_WindowWidth, g_WindowHeight)
@@ -131,7 +152,9 @@ func renderEverything(shader uint32) {
     gl.UseProgram(shader)
 
     defineMatrices(shader)
-    renderObject(shader, g_light)
+    //renderObject(shader, g_light)
+
+    renderObject(shader, g_terrain)
 
     gl.UseProgram(0)
 
@@ -150,8 +173,8 @@ func cbKeyboard(window *glfw.Window, key glfw.Key, scancode int, action glfw.Act
                 printHelp()
             case glfw.KeySpace:
             case glfw.KeyF1:
-                g_fillMode += 1
-                switch (g_fillMode%3) {
+                g_fillMode = (g_fillMode+1) % 3
+                switch (g_fillMode) {
                     case 0:
                         gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
                     case 1:
@@ -163,9 +186,9 @@ func cbKeyboard(window *glfw.Window, key glfw.Key, scancode int, action glfw.Act
 
             case glfw.KeyF3:
             case glfw.KeyUp:
-                g_light.Pos = g_light.Pos.Add(mgl32.Vec3{0,1.0,0})
+                //g_light.Pos = g_light.Pos.Add(mgl32.Vec3{0,1.0,0})
             case glfw.KeyDown:
-                g_light.Pos = g_light.Pos.Add(mgl32.Vec3{0,-1.0,0})
+                //g_light.Pos = g_light.Pos.Add(mgl32.Vec3{0,-1.0,0})
             case glfw.KeyLeft:
             case glfw.KeyRight:
         }
@@ -220,6 +243,13 @@ func mainLoop (window *glfw.Window) {
     registerCallBacks(window)
     glfw.SwapInterval(0)
 
+    gl.Enable(gl.BLEND)
+    gl.BlendEquation(gl.FUNC_ADD)
+    //gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    gl.BlendFunc(gl.ONE, gl.ONE)
+    gl.Disable(gl.DEPTH_TEST)
+    //gl.Enable(gl.DEPTH_TEST)
+
     for !window.ShouldClose() {
 
         displayFPS(window)
@@ -256,7 +286,12 @@ func main() {
         panic(err)
     }
 
-    g_light = CreateObject(CreateUnitSphere(10), mgl32.Vec3{3,15,0}, mgl32.Vec3{0.2,0.2,0.2}, mgl32.Vec3{1,1,0}, true)
+    g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png")
+    g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png")
+    g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m.png")
+
+    //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
+    g_terrain = CreateObject(CreateUnitSquare(500, mgl32.Vec2{0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
 
     mainLoop(window)
 

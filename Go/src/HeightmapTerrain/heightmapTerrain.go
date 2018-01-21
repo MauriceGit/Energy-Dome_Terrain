@@ -37,6 +37,7 @@ var g_viewMatrix          mgl32.Mat4
 
 //var g_light   Object
 var g_terrain Object
+var g_sphere  Object
 var g_heightmapTextureOriginal ImageTexture
 var g_heightmapTexture900m     ImageTexture
 var g_heightmapTextureMerged   ImageTexture
@@ -155,6 +156,7 @@ func renderEverything(shader uint32) {
     //renderObject(shader, g_light)
 
     renderObject(shader, g_terrain)
+    renderObject(shader, g_sphere)
 
     gl.UseProgram(0)
 
@@ -291,7 +293,8 @@ func main() {
     g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m.png")
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
-    g_terrain = CreateObject(CreateUnitSquare(500, mgl32.Vec2{0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
+    g_terrain = CreateObject(CreateUnitSquareGeometry(500, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
+    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,0,0}, mgl32.Vec3{100.,100.,100.}, mgl32.Vec3{139./255.,0,0}, false)
 
     mainLoop(window)
 

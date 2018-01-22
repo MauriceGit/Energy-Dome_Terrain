@@ -24,7 +24,8 @@ const (
 )
 
 const g_WindowTitle  = "Heightmap Terrain"
-var g_ShaderID uint32
+var g_TerrainShaderID uint32
+var g_EnergySphereShaderID uint32
 
 
 // Normal Camera
@@ -41,9 +42,12 @@ var g_sphere  Object
 var g_heightmapTextureOriginal ImageTexture
 var g_heightmapTexture900m     ImageTexture
 var g_heightmapTextureMerged   ImageTexture
+var g_energyTexture            ImageTexture
+var g_energyAnimationTexture   ImageTexture
 
 
 var g_timeSum float32 = 0.0
+var g_currentTime float64 = 0.0
 var g_lastCallTime float64 = 0.0
 var g_frameCount int = 0
 var g_fps float32 = 60.0
@@ -102,7 +106,7 @@ func defineMatrices(shader uint32) {
     gl.UniformMatrix4fv(cameraUniform, 1, false, &viewProjection[0])
 }
 
-func renderObject(shader uint32, obj Object) {
+func renderTerrain(shader uint32, obj Object) {
 
     // Model transformations are now encoded per object directly before rendering it!
     defineModelMatrix(shader, obj.Pos, obj.Scale)
@@ -141,7 +145,31 @@ func renderObject(shader uint32, obj Object) {
     gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
 }
 
-func renderEverything(shader uint32) {
+func renderEnergySphere(shader uint32, obj Object) {
+
+    // Model transformations are now encoded per object directly before rendering it!
+    defineModelMatrix(shader, obj.Pos, obj.Scale)
+
+    gl.BindVertexArray(obj.Geo.VertexBuffer)
+    gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, obj.Geo.IndexBuffer)
+
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("polygonMode\x00")), int32(g_fillMode))
+
+    gl.Uniform1f(gl.GetUniformLocation(shader, gl.Str("dt\x00")), float32(g_currentTime))
+
+    gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("color\x00")), 1, &obj.Color[0])
+
+    gl.ActiveTexture(gl.TEXTURE0)
+    gl.BindTexture(gl.TEXTURE_2D, g_energyTexture.TextureHandle)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("energyTexture\x00")), 0)
+    gl.ActiveTexture(gl.TEXTURE0+1)
+    gl.BindTexture(gl.TEXTURE_2D, g_energyAnimationTexture.TextureHandle)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("energyAnimationTexture\x00")), 1)
+
+    gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
+}
+
+func renderEverything() {
 
     gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
     // Nice blueish background
@@ -150,13 +178,13 @@ func renderEverything(shader uint32) {
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.Viewport(0, 0, g_WindowWidth, g_WindowHeight)
 
-    gl.UseProgram(shader)
+    gl.UseProgram(g_TerrainShaderID)
+    defineMatrices(g_TerrainShaderID)
+    renderTerrain(g_TerrainShaderID, g_terrain)
 
-    defineMatrices(shader)
-    //renderObject(shader, g_light)
-
-    renderObject(shader, g_terrain)
-    renderObject(shader, g_sphere)
+    gl.UseProgram(g_EnergySphereShaderID)
+    defineMatrices(g_EnergySphereShaderID)
+    renderEnergySphere(g_EnergySphereShaderID, g_sphere)
 
     gl.UseProgram(0)
 
@@ -222,8 +250,8 @@ func registerCallBacks (window *glfw.Window) {
 
 
 func displayFPS(window *glfw.Window) {
-    currentTime := glfw.GetTime()
-    g_timeSum += float32(currentTime - g_lastCallTime)
+
+    g_timeSum += float32(g_currentTime - g_lastCallTime)
 
 
     if g_frameCount%60 == 0 {
@@ -234,7 +262,7 @@ func displayFPS(window *glfw.Window) {
         window.SetTitle(s)
     }
 
-    g_lastCallTime = currentTime
+    g_lastCallTime = g_currentTime
     g_frameCount += 1
 
 }
@@ -254,10 +282,11 @@ func mainLoop (window *glfw.Window) {
 
     for !window.ShouldClose() {
 
+        g_currentTime = glfw.GetTime()
         displayFPS(window)
 
         // This actually renders everything.
-        renderEverything(g_ShaderID)
+        renderEverything()
 
         window.SwapBuffers()
         glfw.PollEvents()
@@ -283,7 +312,11 @@ func main() {
     }
 
     path := "../Go/src/HeightmapTerrain/"
-    g_ShaderID, err = NewProgram(path+"vertexShader.vert", path+"fragmentShader.frag")
+    g_TerrainShaderID, err = NewProgram(path+"terrain.vert", path+"terrain.frag")
+    if err != nil {
+        panic(err)
+    }
+    g_EnergySphereShaderID, err = NewProgram(path+"energysphere.vert", path+"energysphere.frag")
     if err != nil {
         panic(err)
     }
@@ -292,9 +325,12 @@ func main() {
     g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png")
     g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m.png")
 
+    g_energyTexture            = CreateImageTexture(path+"Textures/tyllo-caustic1_bw_bigger.png")
+    g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png")
+
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
     g_terrain = CreateObject(CreateUnitSquareGeometry(500, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
-    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,0,0}, mgl32.Vec3{100.,100.,100.}, mgl32.Vec3{139./255.,0,0}, false)
+    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-40,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
 
     mainLoop(window)
 

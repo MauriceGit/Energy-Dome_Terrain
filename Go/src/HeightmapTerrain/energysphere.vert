@@ -11,11 +11,12 @@ uniform mat4 modelMat;
 out vec3 normal;
 out vec3 pos;
 out vec2 uv;
+out vec4 screenPos;
 
 void main() {
 
 
-
+    // No normal matrix right now, because we don't have any rotation right now anyway.
     normal = normalize(vertNormal);
 
 
@@ -24,7 +25,9 @@ void main() {
 
     uv = vertUV;
 
-    gl_Position = viewProjectionMat * tmpPos;
+    screenPos = viewProjectionMat * tmpPos;
+    gl_Position = screenPos;
+    screenPos.xyz /= screenPos.w;
 
 }
 

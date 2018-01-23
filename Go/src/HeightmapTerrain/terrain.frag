@@ -81,7 +81,7 @@ void main() {
         colorOut *= 0.15;
     }
 
-
+    colorOut.a = 1.0;
 
 }
 

@@ -386,6 +386,18 @@ func generateGeometryAttributes(mesh *[]Mesh, meshIndices *[]uint32, vertexCount
     return geo;
 }
 
+func CreateFullscreenQuadGeometry() Geometry {
+    mesh := []Mesh{
+        Mesh{mgl32.Vec3{-1.0,-1.0,0.0},mgl32.Vec3{0.0,0.0,1.0},mgl32.Vec2{0.0,0.0}},
+        Mesh{mgl32.Vec3{ 1.0,-1.0,0.0},mgl32.Vec3{0.0,0.0,1.0},mgl32.Vec2{1.0,0.0}},
+        Mesh{mgl32.Vec3{ 1.0, 1.0,0.0},mgl32.Vec3{0.0,0.0,1.0},mgl32.Vec2{1.0,1.0}},
+        Mesh{mgl32.Vec3{-1.0, 1.0,0.0},mgl32.Vec3{0.0,0.0,1.0},mgl32.Vec2{0.0,1.0}},
+    }
+    meshIndices := []uint32{0,1,2,0,2,3}
+
+    return generateGeometryAttributes(&mesh, &meshIndices, 4, 6)
+}
+
 func CreateUnitSphereGeometry(subdivLat, subdivLong int) Geometry {
     vertexCount := subdivLat * (subdivLong + 1) + 2
     mesh        := make([]Mesh, vertexCount, vertexCount)

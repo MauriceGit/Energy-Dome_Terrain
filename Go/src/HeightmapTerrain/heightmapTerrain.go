@@ -14,8 +14,8 @@ import (
 // Constants and global variables
 
 const (
-    g_WindowWidth  = 1000
-    g_WindowHeight = 1000
+    g_windowWidth  = 1000
+    g_windowHeight = 1000
 
     g_cubeWidth    = 10
     g_cubeHeight   = 10
@@ -23,14 +23,20 @@ const (
 
 )
 
-const g_WindowTitle  = "Heightmap Terrain"
-var g_TerrainShaderID uint32
-var g_EnergySphereShaderID uint32
+const g_windowTitle  = "Heightmap Terrain"
+var g_terrainShaderID uint32
+var g_energySphereShaderID uint32
+var g_fullscreenTexturedShaderID uint32
+
+// Framebuffer object with color and depth attachments
+var g_sceneFbo uint32
+var g_sceneColorTex uint32
+var g_sceneDepthTex uint32
 
 
 // Normal Camera
 var g_fovy      = mgl32.DegToRad(90.0)
-var g_aspect    = float32(g_WindowWidth)/g_WindowHeight
+var g_aspect    = float32(g_windowWidth)/g_windowHeight
 var g_nearPlane = float32(0.1)
 var g_farPlane  = float32(2000.0)
 
@@ -39,6 +45,7 @@ var g_viewMatrix          mgl32.Mat4
 //var g_light   Object
 var g_terrain Object
 var g_sphere  Object
+var g_fullscreenQuad Object
 var g_heightmapTextureOriginal ImageTexture
 var g_heightmapTexture900m     ImageTexture
 var g_heightmapTextureMerged   ImageTexture
@@ -74,7 +81,7 @@ func initGraphicContext() (*glfw.Window, error) {
     glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
     glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-    window, err := glfw.CreateWindow(g_WindowWidth, g_WindowHeight, g_WindowTitle, nil, nil)
+    window, err := glfw.CreateWindow(g_windowWidth, g_windowHeight, g_windowTitle, nil, nil)
     if err != nil {
         return nil, err
     }
@@ -94,6 +101,7 @@ func defineModelMatrix(shader uint32, pos, scale mgl32.Vec3) {
     model := matTrans.Mul4(matScale)
     modelUniform := gl.GetUniformLocation(shader, gl.Str("modelMat\x00"))
     gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+
 }
 
 // Defines the Model-View-Projection matrices for the shader.
@@ -159,34 +167,68 @@ func renderEnergySphere(shader uint32, obj Object) {
 
     gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("color\x00")), 1, &obj.Color[0])
 
+    camPos, _, _ := GetCameraLookAt()
+    gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("camPos\x00")), 1, &camPos[0])
+
     gl.ActiveTexture(gl.TEXTURE0)
     gl.BindTexture(gl.TEXTURE_2D, g_energyTexture.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("energyTexture\x00")), 0)
     gl.ActiveTexture(gl.TEXTURE0+1)
     gl.BindTexture(gl.TEXTURE_2D, g_energyAnimationTexture.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("energyAnimationTexture\x00")), 1)
+    gl.ActiveTexture(gl.TEXTURE0+2)
+    gl.BindTexture(gl.TEXTURE_2D, g_sceneColorTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("sceneColorTex\x00")), 2)
+    gl.ActiveTexture(gl.TEXTURE0+3)
+    gl.BindTexture(gl.TEXTURE_2D, g_sceneDepthTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("sceneDepthTex\x00")), 3)
 
     gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
 }
 
-func renderEverything() {
+func renderFullscreenQuad(shader uint32, obj Object) {
+
+    gl.BindVertexArray(obj.Geo.VertexBuffer)
+    gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, obj.Geo.IndexBuffer)
+
+    gl.ActiveTexture(gl.TEXTURE0)
+    gl.BindTexture(gl.TEXTURE_2D, g_sceneColorTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("overwriteTexture\x00")), 0)
+
+    gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
+}
+
+func renderPostProcessing() {
 
     gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-    // Nice blueish background
-    gl.ClearColor(0,0,0,1)
-
+    gl.ClearColor(0,0,0,0)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-    gl.Viewport(0, 0, g_WindowWidth, g_WindowHeight)
+    gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
 
-    gl.UseProgram(g_TerrainShaderID)
-    defineMatrices(g_TerrainShaderID)
-    renderTerrain(g_TerrainShaderID, g_terrain)
+    gl.UseProgram(g_fullscreenTexturedShaderID)
+    renderFullscreenQuad(g_fullscreenTexturedShaderID, g_fullscreenQuad)
 
-    gl.UseProgram(g_EnergySphereShaderID)
-    defineMatrices(g_EnergySphereShaderID)
-    renderEnergySphere(g_EnergySphereShaderID, g_sphere)
+    gl.Enable(gl.BLEND)
+    gl.Disable(gl.DEPTH_TEST)
 
-    gl.UseProgram(0)
+    gl.UseProgram(g_energySphereShaderID)
+    defineMatrices(g_energySphereShaderID)
+    renderEnergySphere(g_energySphereShaderID, g_sphere)
+
+    gl.Disable(gl.BLEND)
+    gl.Enable(gl.DEPTH_TEST)
+}
+
+func renderSceneFBO() {
+
+    gl.BindFramebuffer(gl.FRAMEBUFFER, g_sceneFbo)
+    gl.ClearColor(0,0,0,0)
+    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
+
+    gl.UseProgram(g_terrainShaderID)
+    defineMatrices(g_terrainShaderID)
+    renderTerrain(g_terrainShaderID, g_terrain)
 
 }
 
@@ -273,20 +315,16 @@ func mainLoop (window *glfw.Window) {
     registerCallBacks(window)
     glfw.SwapInterval(0)
 
-    gl.Enable(gl.BLEND)
     gl.BlendEquation(gl.FUNC_ADD)
-    //gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.BlendFunc(gl.ONE, gl.ONE)
-    gl.Disable(gl.DEPTH_TEST)
-    //gl.Enable(gl.DEPTH_TEST)
 
     for !window.ShouldClose() {
 
         g_currentTime = glfw.GetTime()
         displayFPS(window)
 
-        // This actually renders everything.
-        renderEverything()
+        renderSceneFBO()
+        renderPostProcessing()
 
         window.SwapBuffers()
         glfw.PollEvents()
@@ -312,14 +350,20 @@ func main() {
     }
 
     path := "../Go/src/HeightmapTerrain/"
-    g_TerrainShaderID, err = NewProgram(path+"terrain.vert", path+"terrain.frag")
+    g_terrainShaderID, err = NewProgram(path+"terrain.vert", path+"terrain.frag")
     if err != nil {
         panic(err)
     }
-    g_EnergySphereShaderID, err = NewProgram(path+"energysphere.vert", path+"energysphere.frag")
+    g_energySphereShaderID, err = NewProgram(path+"energysphere.vert", path+"energysphere.frag")
     if err != nil {
         panic(err)
     }
+    g_fullscreenTexturedShaderID, err = NewProgram(path+"fullscreenTextured.vert", path+"fullscreenTextured.frag")
+    if err != nil {
+        panic(err)
+    }
+
+    CreateFbo(&g_sceneFbo, &g_sceneColorTex, &g_sceneDepthTex, g_windowWidth, g_windowHeight, false)
 
     g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png")
     g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png")
@@ -330,7 +374,9 @@ func main() {
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
     g_terrain = CreateObject(CreateUnitSquareGeometry(500, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
-    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-40,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
+    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-50,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
+    g_fullscreenQuad = CreateObject(CreateFullscreenQuadGeometry(), mgl32.Vec3{0,0,0}, mgl32.Vec3{1,1,1}, mgl32.Vec3{0,0,0}, false)
+
 
     mainLoop(window)
 

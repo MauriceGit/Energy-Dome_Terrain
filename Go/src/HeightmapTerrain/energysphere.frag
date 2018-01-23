@@ -17,11 +17,13 @@ uniform int polygonMode;
 uniform sampler2D sceneColorTex;
 uniform sampler2D sceneDepthTex;
 
+uniform vec2 nearFarPlane;
+uniform vec2 windowSize;
+
 out vec4 colorOut;
 
 float linearizeDepth (float depth) {
-    float nearPlane = 0.1, farPlane = 2000.0;
-    return (2.0*nearPlane) / (farPlane + nearPlane - depth * (farPlane - nearPlane));
+    return (2.0*nearFarPlane.x) / (nearFarPlane.y + nearFarPlane.x - depth * (nearFarPlane.y - nearFarPlane.x));
 }
 
 void main() {
@@ -30,7 +32,7 @@ void main() {
     sPos = sPos *0.5 +0.5;
 
     float sphereDepth = screenPos.z*0.5+0.5;
-    float sceneDepth  = texture(sceneDepthTex, gl_FragCoord.xy/vec2(1000)).r;
+    float sceneDepth  = texture(sceneDepthTex, gl_FragCoord.xy/windowSize).r;
 
     // Do the depth testing manually because we render this in post-processing.
     if (sphereDepth > sceneDepth) {
@@ -50,24 +52,22 @@ void main() {
 
     vec3 viewVec = normalize(camPos - pos);
     float d = dot(viewVec, normal);
+    float sphereEdgeHighlightDistance = 0.5;
 
     // Have a nice gradient to the defined color at all edges of the sphere.
-    if (d > 0 && d < 0.5) {
-        colorOut.rgb = mix(colorOut.rgb, color, pow(1.0-d*2.,3));
+    if (d > 0 && d < sphereEdgeHighlightDistance) {
+        colorOut.rgb = mix(colorOut.rgb, color, pow(1.0-d*(1.0/sphereEdgeHighlightDistance),3));
     }
 
     float linearSphereDepth = linearizeDepth(sphereDepth);
     float linearSceneDepth  = linearizeDepth(sceneDepth);
     float linearDepthDiff   = abs(linearSceneDepth-linearSphereDepth);
+    float geometryHighlightDistance = 0.005;
 
-    if (linearDepthDiff <= 0.005) {
-        //colorOut.rgb = vec3(0.3,0,0);
-
-        colorOut.rgb = mix(colorOut.rgb, color, pow(1.0-linearDepthDiff*200.,3));
-
+    // Have a really nice gradient on all geometry defined edges! This is looking much better as expected :)
+    if (linearDepthDiff <= geometryHighlightDistance) {
+        colorOut.rgb = mix(colorOut.rgb, color, pow(1.0-linearDepthDiff*(1.0/geometryHighlightDistance),3));
     }
-
-
 
 }
 

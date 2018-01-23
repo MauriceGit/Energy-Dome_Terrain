@@ -38,7 +38,7 @@ var g_sceneDepthTex uint32
 var g_fovy      = mgl32.DegToRad(90.0)
 var g_aspect    = float32(g_windowWidth)/g_windowHeight
 var g_nearPlane = float32(0.1)
-var g_farPlane  = float32(2000.0)
+var g_farPlane  = float32(20000.0)
 
 var g_viewMatrix          mgl32.Mat4
 
@@ -170,6 +170,14 @@ func renderEnergySphere(shader uint32, obj Object) {
     camPos, _, _ := GetCameraLookAt()
     gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("camPos\x00")), 1, &camPos[0])
 
+
+    nearFarPlane := mgl32.Vec2{g_nearPlane, g_farPlane}
+    gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("nearFarPlane\x00")), 1, &nearFarPlane[0])
+    windowSize := mgl32.Vec2{g_windowWidth, g_windowHeight}
+    gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("windowSize\x00")), 1, &windowSize[0])
+
+
+
     gl.ActiveTexture(gl.TEXTURE0)
     gl.BindTexture(gl.TEXTURE_2D, g_energyTexture.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("energyTexture\x00")), 0)
@@ -211,12 +219,23 @@ func renderPostProcessing() {
     gl.Enable(gl.BLEND)
     gl.Disable(gl.DEPTH_TEST)
 
+    switch (g_fillMode) {
+        case 0:
+            gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+        case 1:
+            gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+        case 2:
+            gl.PolygonMode(gl.FRONT_AND_BACK, gl.POINT)
+    }
+
     gl.UseProgram(g_energySphereShaderID)
     defineMatrices(g_energySphereShaderID)
     renderEnergySphere(g_energySphereShaderID, g_sphere)
 
     gl.Disable(gl.BLEND)
     gl.Enable(gl.DEPTH_TEST)
+
+    gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 }
 
 func renderSceneFBO() {
@@ -226,9 +245,20 @@ func renderSceneFBO() {
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
 
+    switch (g_fillMode) {
+        case 0:
+            gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+        case 1:
+            gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+        case 2:
+            gl.PolygonMode(gl.FRONT_AND_BACK, gl.POINT)
+    }
+
     gl.UseProgram(g_terrainShaderID)
     defineMatrices(g_terrainShaderID)
     renderTerrain(g_terrainShaderID, g_terrain)
+
+    gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 
 }
 
@@ -246,14 +276,14 @@ func cbKeyboard(window *glfw.Window, key glfw.Key, scancode int, action glfw.Act
             case glfw.KeySpace:
             case glfw.KeyF1:
                 g_fillMode = (g_fillMode+1) % 3
-                switch (g_fillMode) {
-                    case 0:
-                        gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
-                    case 1:
-                        gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
-                    case 2:
-                        gl.PolygonMode(gl.FRONT_AND_BACK, gl.POINT)
-                }
+                //switch (g_fillMode) {
+                //    case 0:
+                //        gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+                //    case 1:
+                //        gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+                //    case 2:
+                //        gl.PolygonMode(gl.FRONT_AND_BACK, gl.POINT)
+                //}
             case glfw.KeyF2:
 
             case glfw.KeyF3:
@@ -365,18 +395,17 @@ func main() {
 
     CreateFbo(&g_sceneFbo, &g_sceneColorTex, &g_sceneDepthTex, g_windowWidth, g_windowHeight, false)
 
-    g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png")
-    g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png")
-    g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m.png")
+    g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png", false)
+    g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png", false)
+    g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m.png", false)
 
-    g_energyTexture            = CreateImageTexture(path+"Textures/tyllo-caustic1_bw_bigger.png")
-    g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png")
+    g_energyTexture            = CreateImageTexture(path+"Textures/tyllo-caustic1_bw_bigger.png", true)
+    g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png", true)
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
     g_terrain = CreateObject(CreateUnitSquareGeometry(500, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
-    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-50,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
+    g_sphere  = CreateObject(CreateUnitSphereGeometry(100, 100), mgl32.Vec3{0,-50,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
     g_fullscreenQuad = CreateObject(CreateFullscreenQuadGeometry(), mgl32.Vec3{0,0,0}, mgl32.Vec3{1,1,1}, mgl32.Vec3{0,0,0}, false)
-
 
     mainLoop(window)
 

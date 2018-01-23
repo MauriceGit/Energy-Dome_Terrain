@@ -240,21 +240,19 @@ type Mesh struct {
 func createUnitSphere(subdivLat, subdivLong int, mesh *[]Mesh, meshIndices *[]uint32) {
     var radius float32 = 0.5
 
-    // North pole.
-    (*mesh)[0].Pos    = mgl32.Vec3{0, radius, 0}
-    (*mesh)[0].Normal = mgl32.Vec3{0, radius, 0}.Normalize()
-    (*mesh)[0].UV     = mgl32.Vec2{0,1}
-
-    // South pole.
-    (*mesh)[len((*mesh))-1].Pos    = mgl32.Vec3{0, -radius, 0}
-    (*mesh)[len((*mesh))-1].Normal = mgl32.Vec3{0, -radius, 0}.Normalize()
-    (*mesh)[len((*mesh))-1].UV     = mgl32.Vec2{0,0}
-
     // +1.0f because there's a gap between the poles and the first parallel.
     latitudeSpacing  := 1.0 / (float32(subdivLat) + 1.0)
     longitudeSpacing := 1.0 / float32(subdivLong)
 
-    v := 1
+    v := 0
+    // North pole.
+    for longitude := 0; longitude <= subdivLong+1; longitude++ {
+        (*mesh)[v].Pos    = mgl32.Vec3{0, radius, 0}
+        (*mesh)[v].Normal = mgl32.Vec3{0, radius, 0}.Normalize()
+        (*mesh)[v].UV     = mgl32.Vec2{float32(longitude) * longitudeSpacing,1}
+        v++
+    }
+
     for latitude := 0; latitude < subdivLat; latitude++ {
         for longitude := 0; longitude <= subdivLong; longitude++ {
 
@@ -281,17 +279,17 @@ func createUnitSphere(subdivLat, subdivLong int, mesh *[]Mesh, meshIndices *[]ui
         }
     }
 
-    i := 0
-    // Triangles for the north pole to the first row of longitudes.
-    for longitude := uint32(0); longitude < uint32(subdivLong); longitude++ {
-        (*meshIndices)[i]   = 0
-        (*meshIndices)[i+1] = 1+longitude
-        (*meshIndices)[i+2] = 1+longitude+1
-        i += 3
+    // South pole.
+    for longitude := 0; longitude <= subdivLong+1; longitude++ {
+        (*mesh)[v].Pos    = mgl32.Vec3{0, -radius, 0}
+        (*mesh)[v].Normal = mgl32.Vec3{0, -radius, 0}.Normalize()
+        (*mesh)[v].UV     = mgl32.Vec2{float32(longitude) * longitudeSpacing,0}
+        v++
     }
 
+    i := 0
     // Triangles for the mesh in between the poles. This should be just like any normal rectangular mesh.
-    for latitude := uint32(0); latitude < uint32(subdivLat-1); latitude++ {
+    for latitude := uint32(0); latitude <= uint32(subdivLat); latitude++ {
         for longitude := uint32(0); longitude < uint32(subdivLong); longitude++ {
             (*meshIndices)[i]   = 1+(latitude*(uint32(subdivLong)+1))+longitude
             (*meshIndices)[i+1] = 1+(latitude*(uint32(subdivLong)+1))+longitude + uint32(subdivLong)+1
@@ -303,16 +301,6 @@ func createUnitSphere(subdivLat, subdivLong int, mesh *[]Mesh, meshIndices *[]ui
             i += 6
         }
     }
-
-    // Triangles for the south pole to the last row of longitudes.
-    for longitude := 0; longitude < subdivLong; longitude++ {
-        (*meshIndices)[i]   = uint32(len((*mesh))-(subdivLong+1)-1 + longitude)
-        (*meshIndices)[i+1] = uint32(len((*mesh))-1)
-        (*meshIndices)[i+2] = uint32(len((*mesh))-(subdivLong+1) + longitude)
-        i += 3
-    }
-
-
 }
 
 // Defines the pure vertex and index arrays. Given the pre-allocated arrays, it directly writes into them at
@@ -399,12 +387,12 @@ func CreateFullscreenQuadGeometry() Geometry {
 }
 
 func CreateUnitSphereGeometry(subdivLat, subdivLong int) Geometry {
-    vertexCount := subdivLat * (subdivLong + 1) + 2
+    vertexCount := (subdivLat+2) * (subdivLong + 1) + 2
     mesh        := make([]Mesh, vertexCount, vertexCount)
 
     // (subdivLong+1)*3*2 = A triangle from the first vertex to each of the first latitute.
     // for both poles.
-    indexCount  := (subdivLong+1)*3*2 + (subdivLat-1)*subdivLong*2*3
+    indexCount  := (subdivLat+1)*subdivLong*6
     meshIndices := make([]uint32, indexCount, indexCount)
 
     createUnitSphere(subdivLat, subdivLong, &mesh, &meshIndices)

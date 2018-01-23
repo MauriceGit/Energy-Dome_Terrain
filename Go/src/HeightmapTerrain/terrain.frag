@@ -17,23 +17,6 @@ uniform int polygonMode;
 
 out vec4 colorOut;
 
-vec3 recalculateNormal() {
-    vec3 normal = vec3(0,1,0);
-
-    // calculate tangent and bitangent
-    vec3 P1 = dFdx( pos );
-    vec3 P2 = dFdy( pos );
-    vec2 Q1 = dFdx( uv );
-    vec2 Q2 = dFdy( uv );
-
-    vec3 T = normalize(  P1 * Q2.t - P2 * Q1.t );
-    vec3 B = normalize(  P2 * Q1.s - P1 * Q2.s );
-
-    // construct tangent space matrix and perturb normal
-    mat3 TBN = mat3( T, B, normal );
-    return TBN * normal;
-}
-
 void main() {
     colorOut = vec4(color, 1);
 
@@ -73,13 +56,13 @@ void main() {
     vec4 texColor = texture(heightmapTextureOriginal, uv);
     colorOut = mix(vec4(1.,0.05,0.05,1), vec4(0.15,0.8,0.15,1), texColor.r*3.);
 
-    if (polygonMode == 0) {
-        colorOut *= 0.6;
-    } else if (polygonMode == 1) {
-        colorOut *= 0.1;
-    } else if (polygonMode == 2) {
-        colorOut *= 0.15;
-    }
+    //if (polygonMode == 0) {
+    //    colorOut *= 0.6;
+    //} else if (polygonMode == 1) {
+    //    colorOut *= 0.1;
+    //} else if (polygonMode == 2) {
+    //    colorOut *= 0.15;
+    //}
 
     colorOut.a = 1.0;
 

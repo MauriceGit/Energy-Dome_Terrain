@@ -160,7 +160,7 @@ func CreateTexture(tex *uint32, width, height, internalFormat int32, format, int
     gl.TexImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, internalType, nil);
 }
 
-func CreateImageTexture(imageName string) ImageTexture {
+func CreateImageTexture(imageName string, isRepeating bool) ImageTexture {
 
     var imageTexture ImageTexture
 
@@ -169,16 +169,21 @@ func CreateImageTexture(imageName string) ImageTexture {
         fmt.Printf("Image load failed: %v.\n", err)
     }
 
+    var textureWrap int32 = gl.CLAMP_TO_EDGE
+    if isRepeating {
+        textureWrap = gl.REPEAT
+    }
+
     rgbaImg := image.NewRGBA(img.Img.Bounds())
     draw.Draw(rgbaImg, rgbaImg.Bounds(), img.Img, image.Pt(0, 0), draw.Src)
 
-    gl.GenTextures(1, &imageTexture.TextureHandle);
-    gl.BindTexture(gl.TEXTURE_2D, imageTexture.TextureHandle);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, int32(img.Img.Bounds().Max.X), int32(img.Img.Bounds().Max.Y), 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(rgbaImg.Pix));
+    gl.GenTextures(1, &imageTexture.TextureHandle)
+    gl.BindTexture(gl.TEXTURE_2D, imageTexture.TextureHandle)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, textureWrap)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, textureWrap)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, int32(img.Img.Bounds().Max.X), int32(img.Img.Bounds().Max.Y), 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(rgbaImg.Pix))
 
     imageTexture.TextureSize = mgl32.Vec2{float32(img.Img.Bounds().Max.X), float32(img.Img.Bounds().Max.Y)}
 

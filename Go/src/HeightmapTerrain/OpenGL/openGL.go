@@ -140,24 +140,28 @@ func NewComputeProgram(computeShaderName string) (uint32, error) {
     return program, nil
 }
 
-func CreateMSTexture(tex *uint32, width, height, internalFormat int32, format, internalType uint32) {
-    gl.GenTextures(1, tex);
-    gl.BindTexture(gl.TEXTURE_2D_MULTISAMPLE, *tex);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.TexImage2DMultisample(gl.TEXTURE_2D_MULTISAMPLE, 2, uint32(internalFormat), width, height, false);
-}
+func CreateTexture(width, height int32, internalFormat, format, internalType uint32, multisampling bool, samples, mipmapLevels int32) uint32 {
 
-func CreateTexture(tex *uint32, width, height, internalFormat int32, format, internalType uint32) {
-    gl.GenTextures(1, tex);
-    gl.BindTexture(gl.TEXTURE_2D, *tex);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.TexImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, internalType, nil);
+    var texType uint32 = gl.TEXTURE_2D
+    if multisampling {
+        texType = gl.TEXTURE_2D_MULTISAMPLE
+    }
+
+    var tex uint32
+    gl.GenTextures(1, &tex)
+    gl.BindTexture(texType, tex)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+
+    if multisampling {
+        gl.TexStorage2DMultisample(gl.TEXTURE_2D_MULTISAMPLE, samples, internalFormat, width, height, false)
+    } else {
+        gl.TexStorage2D(gl.TEXTURE_2D, mipmapLevels, internalFormat, width, height)
+    }
+
+    return tex
 }
 
 func CreateImageTexture(imageName string, isRepeating bool) ImageTexture {
@@ -191,36 +195,32 @@ func CreateImageTexture(imageName string, isRepeating bool) ImageTexture {
 
 }
 
-func CreateFboWithExistingTextures(fbo, colorTex, depthTex *uint32, texType uint32) {
-    gl.GenFramebuffers(1, fbo);
-    gl.BindFramebuffer(gl.FRAMEBUFFER, *fbo);
+func CreateFboWithExistingTextures(colorTex, depthTex *uint32, texType uint32) uint32{
+
+    var fbo uint32
+    gl.GenFramebuffers(1, &fbo)
+    gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
 
     if colorTex != nil {
-        gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, texType, *colorTex, 0);
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, texType, *colorTex, 0)
     }
     if depthTex != nil {
-        gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT,  texType, *depthTex, 0);
+        gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT,  texType, *depthTex, 0)
     }
 
-    gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
+    gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+
+    return fbo
 }
 
-
-func CreateLightFbo(fbo, colorTex, depthTex *uint32, width, height int32, multisampling bool) {
+// Some internal format changes, like only having the RG channels but with higher 32F precision.
+func CreateLightFbo(colorTex, depthTex *uint32, width, height int32, multisampling bool, samples int32) uint32 {
 
     if colorTex != nil {
-        if multisampling {
-            CreateMSTexture(colorTex, width, height, gl.RG32F, gl.RG, gl.FLOAT)
-        } else {
-            CreateTexture(colorTex, width, height, gl.RG32F, gl.RG, gl.FLOAT)
-        }
+        *colorTex = CreateTexture(width, height, gl.RG32F, gl.RG, gl.FLOAT, multisampling, samples, 1)
     }
     if depthTex != nil {
-        if multisampling {
-            CreateMSTexture(depthTex, width, height, gl.DEPTH_COMPONENT32, gl.DEPTH_COMPONENT, gl.FLOAT)
-        } else {
-            CreateTexture(depthTex, width, height, gl.DEPTH_COMPONENT32, gl.DEPTH_COMPONENT, gl.FLOAT)
-        }
+        *depthTex = CreateTexture(width, height, gl.DEPTH_COMPONENT32, gl.DEPTH_COMPONENT, gl.FLOAT, multisampling, samples, 1)
     }
 
     var texType uint32 = gl.TEXTURE_2D
@@ -228,25 +228,25 @@ func CreateLightFbo(fbo, colorTex, depthTex *uint32, width, height int32, multis
         texType = gl.TEXTURE_2D_MULTISAMPLE
     }
 
-    CreateFboWithExistingTextures(fbo, colorTex, depthTex, texType)
-
+    return CreateFboWithExistingTextures(colorTex, depthTex, texType)
 }
 
-func CreateFbo(fbo, colorTex, depthTex *uint32, width, height int32, multisampling bool) {
+func CreateFbo(colorTex, depthTex *uint32, width, height int32, multisampling bool, samples int32, isFloatingPoint bool, mipmapLevels int32) uint32 {
+
+    var intFormat uint32 = uint32(gl.RGBA8)
+    var format    uint32 = uint32(gl.RGBA)
+    var ttype     uint32 = uint32(gl.UNSIGNED_BYTE)
+
+    if isFloatingPoint {
+        intFormat = gl.RGBA32F
+        ttype = gl.FLOAT
+    }
 
     if colorTex != nil {
-        if multisampling {
-            CreateMSTexture(colorTex, width, height, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE)
-        } else {
-            CreateTexture(colorTex, width, height, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE)
-        }
+        *colorTex = CreateTexture(width, height, intFormat, format, ttype, multisampling, samples, mipmapLevels)
     }
     if depthTex != nil {
-        if multisampling {
-            CreateMSTexture(depthTex, width, height, gl.DEPTH_COMPONENT32, gl.DEPTH_COMPONENT, gl.FLOAT)
-        } else {
-            CreateTexture(depthTex, width, height, gl.DEPTH_COMPONENT32, gl.DEPTH_COMPONENT, gl.FLOAT)
-        }
+        *depthTex = CreateTexture(width, height, gl.DEPTH_COMPONENT32, gl.DEPTH_COMPONENT, gl.FLOAT, multisampling, samples, 1)
     }
 
     var texType uint32 = gl.TEXTURE_2D
@@ -254,10 +254,6 @@ func CreateFbo(fbo, colorTex, depthTex *uint32, width, height int32, multisampli
         texType = gl.TEXTURE_2D_MULTISAMPLE
     }
 
-    CreateFboWithExistingTextures(fbo, colorTex, depthTex, texType)
-
+    return CreateFboWithExistingTextures(colorTex, depthTex, texType)
 }
-
-
-
 

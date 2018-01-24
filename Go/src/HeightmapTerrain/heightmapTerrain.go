@@ -32,6 +32,10 @@ var g_fullscreenTexturedShaderID uint32
 var g_sceneFbo uint32
 var g_sceneColorTex uint32
 var g_sceneDepthTex uint32
+// Multisampled version
+var g_sceneFboMS uint32
+var g_sceneColorTexMS uint32
+var g_sceneDepthTexMS uint32
 
 
 // Normal Camera
@@ -393,7 +397,8 @@ func main() {
         panic(err)
     }
 
-    CreateFbo(&g_sceneFbo, &g_sceneColorTex, &g_sceneDepthTex, g_windowWidth, g_windowHeight, false)
+    g_sceneFbo   = CreateFbo(&g_sceneColorTex, &g_sceneDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
+    g_sceneFboMS = CreateFbo(&g_sceneColorTexMS, &g_sceneDepthTexMS, g_windowWidth, g_windowHeight, true, 4, false, 1)
 
     g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png", false)
     g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png", false)

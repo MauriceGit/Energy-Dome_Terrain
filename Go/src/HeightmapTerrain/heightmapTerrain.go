@@ -40,6 +40,9 @@ var g_sceneDepthTexMS uint32
 // Multisampling
 var g_multisamplingEnabled bool = true
 
+// Tessellation factor
+var g_tessellationSubdivision int32 = 7
+
 // Normal Camera
 var g_fovy      = mgl32.DegToRad(90.0)
 var g_aspect    = float32(g_windowWidth)/g_windowHeight
@@ -156,7 +159,13 @@ func renderTerrain(shader uint32, obj Object) {
     textureSize := g_heightmapTextureMerged.TextureSize
     gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("textureSize\x00")), 1, &textureSize[0])
 
-    gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("tessSubdivInner\x00")),  g_tessellationSubdivision)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("tessSubdivOuterU\x00")), g_tessellationSubdivision)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("tessSubdivOuterV\x00")), g_tessellationSubdivision)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("tessSubdivOuterW\x00")), g_tessellationSubdivision)
+    gl.PatchParameteri(gl.PATCH_VERTICES, 3)
+
+    gl.DrawElements(gl.PATCHES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
 }
 
 func renderEnergySphere(shader uint32, obj Object) {
@@ -318,9 +327,11 @@ func cbKeyboard(window *glfw.Window, key glfw.Key, scancode int, action glfw.Act
 
             case glfw.KeyF3:
             case glfw.KeyUp:
-                //g_light.Pos = g_light.Pos.Add(mgl32.Vec3{0,1.0,0})
+                g_tessellationSubdivision++
             case glfw.KeyDown:
-                //g_light.Pos = g_light.Pos.Add(mgl32.Vec3{0,-1.0,0})
+                if g_tessellationSubdivision > 1 {
+                    g_tessellationSubdivision--
+                }
             case glfw.KeyLeft:
             case glfw.KeyRight:
         }
@@ -410,7 +421,7 @@ func main() {
     }
 
     path := "../Go/src/HeightmapTerrain/"
-    g_terrainShaderID, err = NewProgram(path+"terrain.vert", "", "", path+"terrain.frag")
+    g_terrainShaderID, err = NewProgram(path+"simple.vert", path+"simple.tcs", path+"terrain.tes", path+"terrain.frag")
     if err != nil {
         panic(err)
     }
@@ -434,8 +445,8 @@ func main() {
     g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png", true)
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
-    g_terrain = CreateObject(CreateUnitSquareGeometry(100, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
-    g_sphere  = CreateObject(CreateUnitSphereGeometry(100, 100), mgl32.Vec3{0,-50,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
+    g_terrain = CreateObject(CreateUnitSquareGeometry(10, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{1000.,1000.,1000.}, mgl32.Vec3{139./255.,0,0}, false)
+    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-100,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
     g_fullscreenQuad = CreateObject(CreateFullscreenQuadGeometry(), mgl32.Vec3{0,0,0}, mgl32.Vec3{1,1,1}, mgl32.Vec3{0,0,0}, false)
 
     mainLoop(window)

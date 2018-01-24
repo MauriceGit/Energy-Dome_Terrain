@@ -1,0 +1,46 @@
+#version 430
+
+layout(triangles, equal_spacing, cw) in;
+in vec3 tcPos[];
+in vec3 tcNormal[];
+in vec2 tcUV[];
+out vec3 tePos;
+out vec3 teNormal;
+out vec2 teUV;
+
+// Normal attributes
+uniform mat4 viewProjectionMat;
+uniform mat4 modelMat;
+
+uniform sampler2D heightmapTextureOriginal;
+uniform sampler2D heightmapTextureMerged;
+uniform sampler2D heightmapTexture900m;
+uniform vec2 textureSize;
+
+void main()
+{
+    vec3 p0 = gl_TessCoord.x * tcPos[0];
+    vec3 p1 = gl_TessCoord.y * tcPos[1];
+    vec3 p2 = gl_TessCoord.z * tcPos[2];
+
+    vec3 n0 = gl_TessCoord.x * tcNormal[0];
+    vec3 n1 = gl_TessCoord.y * tcNormal[1];
+    vec3 n2 = gl_TessCoord.z * tcNormal[2];
+
+    vec2 uv0 = gl_TessCoord.x * tcUV[0];
+    vec2 uv1 = gl_TessCoord.y * tcUV[1];
+    vec2 uv2 = gl_TessCoord.z * tcUV[2];
+
+    vec3 vertPos = p0 + p1 + p2;
+    teNormal     = normalize(n0 + n1 + n2);
+    teUV         = uv0 + uv1 + uv2;
+
+    float height = texture(heightmapTextureOriginal, teUV).r;
+    vec4 tmpPos = modelMat * vec4(vertPos + vec3(0,height * 0.6 - 0.3,0),1);
+    //vec4 tmpPos = modelMat * vec4(vertPos,1);
+    tePos = tmpPos.xyz;
+
+    gl_Position = viewProjectionMat * tmpPos;
+
+}
+

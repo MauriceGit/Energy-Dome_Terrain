@@ -1,0 +1,30 @@
+#version 430
+
+layout(vertices = 3) out;
+in vec3 vPos[];
+in vec3 vNormal[];
+in vec2 vUV[];
+out vec3 tcPos[];
+out vec3 tcNormal[];
+out vec2 tcUV[];
+
+uniform int tessSubdivInner;
+uniform int tessSubdivOuterU;
+uniform int tessSubdivOuterV;
+uniform int tessSubdivOuterW;
+
+void main()
+{
+
+    if (gl_InvocationID == 0) {
+        gl_TessLevelInner[0] = tessSubdivInner;
+        gl_TessLevelOuter[0] = tessSubdivOuterU;
+        gl_TessLevelOuter[1] = tessSubdivOuterV;
+        gl_TessLevelOuter[2] = tessSubdivOuterW;
+    }
+
+    tcPos[gl_InvocationID] = vPos[gl_InvocationID];
+    tcNormal[gl_InvocationID] = vNormal[gl_InvocationID];
+    tcUV[gl_InvocationID] = vUV[gl_InvocationID];
+}
+

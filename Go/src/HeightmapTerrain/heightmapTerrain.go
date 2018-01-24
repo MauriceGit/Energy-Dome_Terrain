@@ -29,9 +29,12 @@ var g_energySphereShaderID uint32
 var g_fullscreenTexturedShaderID uint32
 
 // Framebuffer object with color and depth attachments
-var g_sceneFbo uint32
-var g_sceneColorTex uint32
-var g_sceneDepthTex uint32
+var g_terrainFbo uint32
+var g_terrainColorTex uint32
+var g_terrainDepthTex uint32
+var g_sphereFbo uint32
+var g_sphereColorTex uint32
+var g_sphereDepthTex uint32
 // Multisampled version
 var g_sceneFboMS uint32
 var g_sceneColorTexMS uint32
@@ -200,10 +203,10 @@ func renderEnergySphere(shader uint32, obj Object) {
     gl.BindTexture(gl.TEXTURE_2D, g_energyAnimationTexture.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("energyAnimationTexture\x00")), 1)
     gl.ActiveTexture(gl.TEXTURE0+2)
-    gl.BindTexture(gl.TEXTURE_2D, g_sceneColorTex)
+    gl.BindTexture(gl.TEXTURE_2D, g_terrainColorTex)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("sceneColorTex\x00")), 2)
     gl.ActiveTexture(gl.TEXTURE0+3)
-    gl.BindTexture(gl.TEXTURE_2D, g_sceneDepthTex)
+    gl.BindTexture(gl.TEXTURE_2D, g_terrainDepthTex)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("sceneDepthTex\x00")), 3)
 
     gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
@@ -215,15 +218,28 @@ func renderFullscreenQuad(shader uint32, obj Object) {
     gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, obj.Geo.IndexBuffer)
 
     gl.ActiveTexture(gl.TEXTURE0)
-    gl.BindTexture(gl.TEXTURE_2D, g_sceneColorTex)
-    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("overwriteTexture\x00")), 0)
+    gl.BindTexture(gl.TEXTURE_2D, g_terrainColorTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("terrainTexture\x00")), 0)
+    gl.ActiveTexture(gl.TEXTURE0+1)
+    gl.BindTexture(gl.TEXTURE_2D, g_sphereColorTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("sphereTexture\x00")), 1)
 
     gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
 }
 
-func renderPostProcessing() {
+func renderTextureCombine() {
+    gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+    gl.ClearColor(0,0,0,0)
+    gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
 
-    var fbo uint32 = 0
+    gl.UseProgram(g_fullscreenTexturedShaderID)
+    renderFullscreenQuad(g_fullscreenTexturedShaderID, g_fullscreenQuad)
+}
+
+func renderEnergySphereFbo() {
+
+    var fbo uint32 = g_sphereFbo
     if g_multisamplingEnabled {
         fbo = g_sceneFboMS
     }
@@ -233,8 +249,8 @@ func renderPostProcessing() {
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
 
-    gl.UseProgram(g_fullscreenTexturedShaderID)
-    renderFullscreenQuad(g_fullscreenTexturedShaderID, g_fullscreenQuad)
+    //gl.UseProgram(g_fullscreenTexturedShaderID)
+    //renderFullscreenQuad(g_fullscreenTexturedShaderID, g_fullscreenQuad)
 
     gl.Enable(gl.BLEND)
     gl.Disable(gl.DEPTH_TEST)
@@ -259,15 +275,15 @@ func renderPostProcessing() {
 
     if g_multisamplingEnabled {
         gl.BindFramebuffer(gl.READ_FRAMEBUFFER, g_sceneFboMS)
-        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
+        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, g_sphereFbo)
         gl.DrawBuffer(gl.BACK)
         gl.BlitFramebuffer(0, 0, g_windowWidth, g_windowHeight, 0, 0, g_windowWidth, g_windowHeight, gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT, gl.NEAREST)
     }
 }
 
-func renderSceneFBO() {
+func renderTerrainFbo() {
 
-    var fbo uint32 = g_sceneFbo
+    var fbo uint32 = g_terrainFbo
     if g_multisamplingEnabled {
         fbo = g_sceneFboMS
     }
@@ -294,7 +310,7 @@ func renderSceneFBO() {
 
     if g_multisamplingEnabled {
         gl.BindFramebuffer(gl.READ_FRAMEBUFFER, g_sceneFboMS)
-        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, g_sceneFbo)
+        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, g_terrainFbo)
         gl.DrawBuffer(gl.BACK)
         gl.BlitFramebuffer(0, 0, g_windowWidth, g_windowHeight, 0, 0, g_windowWidth, g_windowHeight, gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT, gl.NEAREST)
     }
@@ -394,8 +410,9 @@ func mainLoop (window *glfw.Window) {
         g_currentTime = glfw.GetTime()
         displayFPS(window)
 
-        renderSceneFBO()
-        renderPostProcessing()
+        renderTerrainFbo()
+        renderEnergySphereFbo()
+        renderTextureCombine()
 
         window.SwapBuffers()
         glfw.PollEvents()
@@ -429,12 +446,13 @@ func main() {
     if err != nil {
         panic(err)
     }
-    g_fullscreenTexturedShaderID, err = NewProgram(path+"fullscreenTextured.vert", "", "", path+"fullscreenTextured.frag")
+    g_fullscreenTexturedShaderID, err = NewProgram(path+"fullscreenTextureCombine.vert", "", "", path+"fullscreenTextureCombine.frag")
     if err != nil {
         panic(err)
     }
 
-    g_sceneFbo   = CreateFbo(&g_sceneColorTex, &g_sceneDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
+    g_terrainFbo   = CreateFbo(&g_terrainColorTex, &g_terrainDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
+    g_sphereFbo    = CreateFbo(&g_sphereColorTex, &g_sphereDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
     g_sceneFboMS = CreateFbo(&g_sceneColorTexMS, &g_sceneDepthTexMS, g_windowWidth, g_windowHeight, true, 4, false, 1)
 
     g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png", false)
@@ -445,8 +463,12 @@ func main() {
     g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png", true)
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
+
+    //energyColor := mgl32.Vec3{0.2,0.55,0.3}
+    energyColor := mgl32.Vec3{0.1,0.15,0.55}
+
     g_terrain = CreateObject(CreateUnitSquareGeometry(10, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{1000.,1000.,1000.}, mgl32.Vec3{139./255.,0,0}, false)
-    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-100,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
+    g_sphere  = CreateObject(CreateUnitSphereGeometry(50, 50), mgl32.Vec3{0,-100,0}, mgl32.Vec3{400.,400.,400.}, energyColor, false)
     g_fullscreenQuad = CreateObject(CreateFullscreenQuadGeometry(), mgl32.Vec3{0,0,0}, mgl32.Vec3{1,1,1}, mgl32.Vec3{0,0,0}, false)
 
     mainLoop(window)

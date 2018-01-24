@@ -50,7 +50,7 @@ var g_tessellationSubdivision int32 = 7
 var g_fovy      = mgl32.DegToRad(90.0)
 var g_aspect    = float32(g_windowWidth)/g_windowHeight
 var g_nearPlane = float32(0.1)
-var g_farPlane  = float32(20000.0)
+var g_farPlane  = float32(2000.0)
 
 var g_viewMatrix          mgl32.Mat4
 
@@ -161,6 +161,11 @@ func renderTerrain(shader uint32, obj Object) {
 
     textureSize := g_heightmapTextureMerged.TextureSize
     gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("textureSize\x00")), 1, &textureSize[0])
+
+    camPos, _, _ := GetCameraLookAt()
+    gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("camPos\x00")), 1, &camPos[0])
+    nearFarPlane := mgl32.Vec2{g_nearPlane, g_farPlane}
+    gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("nearFarPlane\x00")), 1, &nearFarPlane[0])
 
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("tessSubdivInner\x00")),  g_tessellationSubdivision)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("tessSubdivOuterU\x00")), g_tessellationSubdivision)

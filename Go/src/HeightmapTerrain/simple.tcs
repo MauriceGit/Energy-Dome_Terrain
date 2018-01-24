@@ -13,14 +13,51 @@ uniform int tessSubdivOuterU;
 uniform int tessSubdivOuterV;
 uniform int tessSubdivOuterW;
 
+uniform vec3 camPos;
+uniform sampler2D heightmapTextureOriginal;
+uniform mat4 modelMat;
+uniform vec2 nearFarPlane;
+
+// We need to calculate this again later, but need it here to get a real distance to the camera
+// after every model transform is done.
+int calcTessellationLevel(int index0, int index1) {
+    float h = (texture(heightmapTextureOriginal, vUV[index0]).r + texture(heightmapTextureOriginal, vUV[index1]).r) / 2.;
+    vec3  p = (vPos[index0] + vPos[index1]) / 2.;
+    vec4 tmpPos = modelMat * vec4(p + vec3(0,h * 0.6 - 0.3,0),1);
+    float d = length(camPos - tmpPos.xyz);
+
+    float maxDist = 500;
+    float minDist = 50;
+    int maxTess = 50;
+    int minTess = 1;
+
+    if (d <= minDist) {
+        return maxTess;
+    }
+    if (d >= maxDist+minDist) {
+        return minTess;
+    }
+
+    // now d is in between 50 and 550.
+    d -= minDist;
+    d /= maxDist;
+
+    d = pow(1.0-d, 4.);
+
+    return int(mix(minTess, maxTess, d));
+}
+
 void main()
 {
+    int tessellationU = calcTessellationLevel(1,2);
+    int tessellationV = calcTessellationLevel(2,0);
+    int tessellationW = calcTessellationLevel(0,1);
 
     if (gl_InvocationID == 0) {
-        gl_TessLevelInner[0] = tessSubdivInner;
-        gl_TessLevelOuter[0] = tessSubdivOuterU;
-        gl_TessLevelOuter[1] = tessSubdivOuterV;
-        gl_TessLevelOuter[2] = tessSubdivOuterW;
+        gl_TessLevelInner[0] = (tessellationU+tessellationV+tessellationW)/3;
+        gl_TessLevelOuter[0] = tessellationU;
+        gl_TessLevelOuter[1] = tessellationV;
+        gl_TessLevelOuter[2] = tessellationW;
     }
 
     tcPos[gl_InvocationID] = vPos[gl_InvocationID];

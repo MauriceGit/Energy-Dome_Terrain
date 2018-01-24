@@ -62,23 +62,43 @@ func readFile(name string) (string, error) {
 
 // Mostly taken from the Demo. But compiling and linking shaders
 // just should be done like this anyways.
-func NewProgram(vertexShaderName, fragmentShaderName string) (uint32, error) {
+func NewProgram(vertexShaderName, tessControlShaderName, tessEvalShaderName, fragmentShaderName string) (uint32, error) {
+    useTessellationShader := tessControlShaderName != "" && tessEvalShaderName != ""
 
     vertexShaderSource, err := readFile(vertexShaderName)
     if err != nil {
         return 0, err
+    }
+    vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+    if err != nil {
+        return 0, err
+    }
+
+    // Compile Tessellation shader
+    var tessControlShader, tessEvalShader uint32
+    if useTessellationShader {
+        tessControlSource, err := readFile(tessControlShaderName)
+        if err != nil {
+            return 0, err
+        }
+        tessControlShader, err = compileShader(tessControlSource, gl.TESS_CONTROL_SHADER)
+        if err != nil {
+            return 0, err
+        }
+        tessEvalSource, err := readFile(tessEvalShaderName)
+        if err != nil {
+            return 0, err
+        }
+        tessEvalShader, err = compileShader(tessEvalSource, gl.TESS_EVALUATION_SHADER)
+        if err != nil {
+            return 0, err
+        }
     }
 
     fragmentShaderSource, err := readFile(fragmentShaderName)
     if err != nil {
         return 0, err
     }
-
-    vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-    if err != nil {
-        return 0, err
-    }
-
     fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
     if err != nil {
         return 0, err
@@ -87,6 +107,10 @@ func NewProgram(vertexShaderName, fragmentShaderName string) (uint32, error) {
     program := gl.CreateProgram()
 
     gl.AttachShader(program, vertexShader)
+    if useTessellationShader {
+        gl.AttachShader(program, tessControlShader)
+        gl.AttachShader(program, tessEvalShader)
+    }
     gl.AttachShader(program, fragmentShader)
     gl.LinkProgram(program)
 
@@ -103,6 +127,10 @@ func NewProgram(vertexShaderName, fragmentShaderName string) (uint32, error) {
     }
 
     gl.DeleteShader(vertexShader)
+    if useTessellationShader {
+        gl.DeleteShader(tessControlShader)
+        gl.DeleteShader(tessEvalShader)
+    }
     gl.DeleteShader(fragmentShader)
 
     return program, nil

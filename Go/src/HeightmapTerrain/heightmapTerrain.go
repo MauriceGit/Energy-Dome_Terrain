@@ -410,15 +410,15 @@ func main() {
     }
 
     path := "../Go/src/HeightmapTerrain/"
-    g_terrainShaderID, err = NewProgram(path+"terrain.vert", path+"terrain.frag")
+    g_terrainShaderID, err = NewProgram(path+"terrain.vert", "", "", path+"terrain.frag")
     if err != nil {
         panic(err)
     }
-    g_energySphereShaderID, err = NewProgram(path+"energysphere.vert", path+"energysphere.frag")
+    g_energySphereShaderID, err = NewProgram(path+"energysphere.vert", "", "", path+"energysphere.frag")
     if err != nil {
         panic(err)
     }
-    g_fullscreenTexturedShaderID, err = NewProgram(path+"fullscreenTextured.vert", path+"fullscreenTextured.frag")
+    g_fullscreenTexturedShaderID, err = NewProgram(path+"fullscreenTextured.vert", "", "", path+"fullscreenTextured.frag")
     if err != nil {
         panic(err)
     }

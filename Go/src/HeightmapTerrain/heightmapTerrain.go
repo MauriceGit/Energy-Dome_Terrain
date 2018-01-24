@@ -37,6 +37,8 @@ var g_sceneFboMS uint32
 var g_sceneColorTexMS uint32
 var g_sceneDepthTexMS uint32
 
+// Multisampling
+var g_multisamplingEnabled bool = true
 
 // Normal Camera
 var g_fovy      = mgl32.DegToRad(90.0)
@@ -212,7 +214,12 @@ func renderFullscreenQuad(shader uint32, obj Object) {
 
 func renderPostProcessing() {
 
-    gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+    var fbo uint32 = 0
+    if g_multisamplingEnabled {
+        fbo = g_sceneFboMS
+    }
+
+    gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
     gl.ClearColor(0,0,0,0)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
@@ -240,11 +247,23 @@ func renderPostProcessing() {
     gl.Enable(gl.DEPTH_TEST)
 
     gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+
+    if g_multisamplingEnabled {
+        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, g_sceneFboMS)
+        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, 0)
+        gl.DrawBuffer(gl.BACK)
+        gl.BlitFramebuffer(0, 0, g_windowWidth, g_windowHeight, 0, 0, g_windowWidth, g_windowHeight, gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT, gl.NEAREST)
+    }
 }
 
 func renderSceneFBO() {
 
-    gl.BindFramebuffer(gl.FRAMEBUFFER, g_sceneFbo)
+    var fbo uint32 = g_sceneFbo
+    if g_multisamplingEnabled {
+        fbo = g_sceneFboMS
+    }
+
+    gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
     gl.ClearColor(0,0,0,0)
     gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.Viewport(0, 0, g_windowWidth, g_windowHeight)
@@ -263,6 +282,13 @@ func renderSceneFBO() {
     renderTerrain(g_terrainShaderID, g_terrain)
 
     gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+
+    if g_multisamplingEnabled {
+        gl.BindFramebuffer(gl.READ_FRAMEBUFFER, g_sceneFboMS)
+        gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, g_sceneFbo)
+        gl.DrawBuffer(gl.BACK)
+        gl.BlitFramebuffer(0, 0, g_windowWidth, g_windowHeight, 0, 0, g_windowWidth, g_windowHeight, gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT, gl.NEAREST)
+    }
 
 }
 
@@ -408,7 +434,7 @@ func main() {
     g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png", true)
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
-    g_terrain = CreateObject(CreateUnitSquareGeometry(500, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
+    g_terrain = CreateObject(CreateUnitSquareGeometry(100, mgl32.Vec3{0,0,0}), mgl32.Vec3{0,0,0}, mgl32.Vec3{500.,500.,500.}, mgl32.Vec3{139./255.,0,0}, false)
     g_sphere  = CreateObject(CreateUnitSphereGeometry(100, 100), mgl32.Vec3{0,-50,0}, mgl32.Vec3{400.,400.,400.}, mgl32.Vec3{0.2,139./255.,0.3}, false)
     g_fullscreenQuad = CreateObject(CreateFullscreenQuadGeometry(), mgl32.Vec3{0,0,0}, mgl32.Vec3{1,1,1}, mgl32.Vec3{0,0,0}, false)
 

@@ -28,8 +28,8 @@ int calcTessellationLevel(int index0, int index1) {
 
     float maxDist = 500;
     float minDist = 50;
-    int maxTess = 50;
-    int minTess = 20;
+    int maxTess = 64;
+    int minTess = 5;
 
     if (d <= minDist) {
         return maxTess;

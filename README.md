@@ -1,11 +1,11 @@
 # Heightmap terrain with an animated energy dome
 
 **Disclaimer:** *This is nothing much more than a little fun project. I wanted to try some ideas and effects and decided to put it all in this project.
-It turned out to be fun and nice looking. Don't ask me, what that is for exactly ;)*
+It turned out to be fun and nice looking. Don't ask me what that is for exactly ;)*
 
 ## How does it look? (Just to keep you interested :))
 
-This is, how:
+This is how:
 ![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/final_energy_sphere.png "a colored heightmap terrain with an energy dome")
 
 ## What is that?

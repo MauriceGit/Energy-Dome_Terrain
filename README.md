@@ -39,3 +39,11 @@ Visible LOD (level of detail) on the mesh:
 
 How it looked at some point before:
 ![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/energy_sphere_multisampled.png "before color adjustments")
+
+## How to run it:
+
+To run this demo, you only need **Golang** installed on your system. And a graphics card, that supports **OpenGL 4.3**.
+
+On linux, you can just run the *compile.sh* file in the main folder.
+
+On Windows, you have to copy the command from the *compile.sh* and run it directly.

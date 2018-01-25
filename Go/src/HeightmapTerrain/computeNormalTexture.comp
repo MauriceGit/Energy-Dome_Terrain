@@ -1,0 +1,30 @@
+#version 430
+
+// Process particles in blocks of 240. Because my graphics card has 240 shader units.
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout (binding=0, rgba8) readonly  uniform image2D terrainTexture;
+layout (binding=1, rgba8) writeonly uniform image2D normalTexture;
+
+uniform vec2 windowSize;
+
+void main(void)
+{
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+    float height = imageLoad(terrainTexture, pos).r;
+    float s01 = imageLoad(terrainTexture, pos + ivec2(-1, 0)).r;
+    float s21 = imageLoad(terrainTexture, pos + ivec2( 1, 0)).r;
+    float s10 = imageLoad(terrainTexture, pos + ivec2( 0,-1)).r;
+    float s12 = imageLoad(terrainTexture, pos + ivec2( 0, 1)).r;
+
+    vec3 va = normalize(vec3(2/windowSize.x,s21-s01,0));
+    vec3 vb = normalize(vec3(0,s12-s10,-2/windowSize.y));
+
+    imageStore(normalTexture, pos, vec4(cross(va,vb), height));
+
+    //imageStore(normalTexture, pos, vec4(vec2(pos)/windowSize,0,1));
+    //imageStore(normalTexture, pos, vec4(imageLoad(terrainTexture, pos).r));
+
+
+}

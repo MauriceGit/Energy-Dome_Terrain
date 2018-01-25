@@ -284,4 +284,3 @@ func CreateFbo(colorTex, depthTex *uint32, width, height int32, multisampling bo
 
     return CreateFboWithExistingTextures(colorTex, depthTex, texType)
 }
-

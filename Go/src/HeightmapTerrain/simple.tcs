@@ -29,7 +29,7 @@ int calcTessellationLevel(int index0, int index1) {
     float maxDist = 500;
     float minDist = 50;
     int maxTess = 50;
-    int minTess = 1;
+    int minTess = 20;
 
     if (d <= minDist) {
         return maxTess;
@@ -64,4 +64,3 @@ void main()
     tcNormal[gl_InvocationID] = vNormal[gl_InvocationID];
     tcUV[gl_InvocationID] = vUV[gl_InvocationID];
 }
-

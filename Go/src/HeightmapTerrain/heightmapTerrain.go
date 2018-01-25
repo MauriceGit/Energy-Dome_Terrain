@@ -24,21 +24,23 @@ const (
 )
 
 const g_windowTitle  = "Heightmap Terrain"
-var g_terrainShaderID uint32
-var g_energySphereShaderID uint32
-var g_fullscreenTexturedShaderID uint32
+var g_terrainShaderID              uint32
+var g_energySphereShaderID         uint32
+var g_fullscreenTexturedShaderID   uint32
+var g_computeNormalTextureShaderID uint32
 
 // Framebuffer object with color and depth attachments
-var g_terrainFbo uint32
-var g_terrainColorTex uint32
-var g_terrainDepthTex uint32
-var g_sphereFbo uint32
-var g_sphereColorTex uint32
-var g_sphereDepthTex uint32
+var g_terrainFbo       uint32
+var g_terrainColorTex  uint32
+var g_terrainDepthTex  uint32
+var g_terrainNormalTex uint32
+var g_sphereFbo        uint32
+var g_sphereColorTex   uint32
+var g_sphereDepthTex   uint32
 // Multisampled version
-var g_sceneFboMS uint32
-var g_sceneColorTexMS uint32
-var g_sceneDepthTexMS uint32
+var g_sceneFboMS       uint32
+var g_sceneColorTexMS  uint32
+var g_sceneDepthTexMS  uint32
 
 // Multisampling
 var g_multisamplingEnabled bool = true
@@ -138,7 +140,7 @@ func renderTerrain(shader uint32, obj Object) {
 
     gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("color\x00")), 1, &obj.Color[0])
 
-    lightPos := mgl32.Vec3{60,80,0}
+    lightPos := mgl32.Vec3{2000,10,0}
 
     gl.Uniform3fv(gl.GetUniformLocation(shader, gl.Str("light\x00")), 1, &lightPos[0])
     var isLighti int32 = 0
@@ -150,14 +152,15 @@ func renderTerrain(shader uint32, obj Object) {
     gl.ActiveTexture(gl.TEXTURE0)
     gl.BindTexture(gl.TEXTURE_2D, g_heightmapTextureOriginal.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("heightmapTextureOriginal\x00")), 0)
-
     gl.ActiveTexture(gl.TEXTURE0+1)
     gl.BindTexture(gl.TEXTURE_2D, g_heightmapTextureMerged.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("heightmapTextureMerged\x00")), 1)
-
     gl.ActiveTexture(gl.TEXTURE0+2)
     gl.BindTexture(gl.TEXTURE_2D, g_heightmapTexture900m.TextureHandle)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("heightmapTexture900m\x00")), 2)
+    gl.ActiveTexture(gl.TEXTURE0+3)
+    gl.BindTexture(gl.TEXTURE_2D, g_terrainNormalTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("terrainNormalHeightTexture\x00")), 3)
 
     textureSize := g_heightmapTextureMerged.TextureSize
     gl.Uniform2fv(gl.GetUniformLocation(shader, gl.Str("textureSize\x00")), 1, &textureSize[0])
@@ -228,6 +231,9 @@ func renderFullscreenQuad(shader uint32, obj Object) {
     gl.ActiveTexture(gl.TEXTURE0+1)
     gl.BindTexture(gl.TEXTURE_2D, g_sphereColorTex)
     gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("sphereTexture\x00")), 1)
+    gl.ActiveTexture(gl.TEXTURE0+2)
+    gl.BindTexture(gl.TEXTURE_2D, g_terrainNormalTex)
+    gl.Uniform1i(gl.GetUniformLocation(shader, gl.Str("terrainNormalTexture\x00")), 2)
 
     gl.DrawElements(gl.TRIANGLES, obj.Geo.IndexCount, gl.UNSIGNED_INT, gl.PtrOffset(0))
 }
@@ -427,6 +433,34 @@ func mainLoop (window *glfw.Window) {
 
 }
 
+// Computes the normals from the original texture directly (only once), so
+// we can compute nice lighting later in the shader without having to recompute
+// the normals on the fly.
+func computeTerrainNormals(terrainTexture, normalTexture uint32) {
+    gl.UseProgram(g_computeNormalTextureShaderID)
+
+    gl.BindImageTexture(0, terrainTexture,  0, false, 0, gl.READ_ONLY,  gl.RGBA8)
+    gl.BindImageTexture(1, normalTexture, 0, false, 0, gl.WRITE_ONLY, gl.RGBA8)
+
+    windowSize := mgl32.Vec2{g_windowWidth, g_windowHeight}
+    gl.Uniform2fv(gl.GetUniformLocation(g_computeNormalTextureShaderID, gl.Str("windowSize\x00")), 1, &windowSize[0])
+
+    var wgSize int = 16
+
+    var wgSizeX uint32 = uint32(g_windowWidth/wgSize)
+    if float32(g_windowWidth) / float32(wgSize) > float32(wgSizeX) {
+        wgSizeX += 1
+    }
+    var wgSizeY uint32 = uint32(g_windowHeight/wgSize)
+    if float32(g_windowHeight) / float32(wgSize) > float32(wgSizeY) {
+        wgSizeY += 1
+    }
+
+    gl.DispatchCompute(wgSizeX, wgSizeY, 1);
+    gl.MemoryBarrier(gl.SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    gl.UseProgram(0);
+}
+
 func main() {
     var err error = nil
     if err = glfw.Init(); err != nil {
@@ -456,16 +490,24 @@ func main() {
         panic(err)
     }
 
-    g_terrainFbo   = CreateFbo(&g_terrainColorTex, &g_terrainDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
-    g_sphereFbo    = CreateFbo(&g_sphereColorTex, &g_sphereDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
+    g_computeNormalTextureShaderID, err = NewComputeProgram(path+"computeNormalTexture.comp")
+    if err != nil {
+        panic(err)
+    }
+
+    g_terrainFbo = CreateFbo(&g_terrainColorTex, &g_terrainDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
+    g_sphereFbo  = CreateFbo(&g_sphereColorTex, &g_sphereDepthTex, g_windowWidth, g_windowHeight, false, 1, false, 1)
     g_sceneFboMS = CreateFbo(&g_sceneColorTexMS, &g_sceneDepthTexMS, g_windowWidth, g_windowHeight, true, 4, false, 1)
 
     g_heightmapTextureMerged   = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Merged.png", false)
     g_heightmapTextureOriginal = CreateImageTexture(path+"Textures/boeblingen_Height_Map_Original.png", false)
-    g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m.png", false)
+    g_heightmapTexture900m     = CreateImageTexture(path+"Textures/boeblingen_Height_Map_900m_Equalized.png", false)
 
     g_energyTexture            = CreateImageTexture(path+"Textures/tyllo-caustic1_bw_bigger.png", true)
     g_energyAnimationTexture   = CreateImageTexture(path+"Textures/tyllo-caustics02_big.png", true)
+
+    g_terrainNormalTex = CreateTexture(g_windowWidth, g_windowHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1)
+    computeTerrainNormals(g_heightmapTexture900m.TextureHandle, g_terrainNormalTex)
 
     //g_light   = CreateObject(CreateUnitSphere(10), mgl32.Vec3{60,80,0}, mgl32.Vec3{10.2,10.2,10.2}, mgl32.Vec3{0,0,0}, true)
 
@@ -479,7 +521,3 @@ func main() {
     mainLoop(window)
 
 }
-
-
-
-

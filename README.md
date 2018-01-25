@@ -22,6 +22,7 @@ This idea is based on a [youtube video](https://www.youtube.com/watch?v=zLSPaE1q
 * Compute shader for calculating the normals based on the heightmap for nicer shading (turns out 8bit color is not much, can't really use the normals without further post-processing).
 * The energy dome, implemented using multiple simplex noise images. One for the energy, one for further animation.
 * Image distortion where the energy is high. As the energy dome is rendered as a post-processing effect of the scene, there is a uv-distortion based on energy level.
+* Hardware Multisampling (MSAA)
 
 ## What now?
 

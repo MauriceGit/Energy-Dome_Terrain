@@ -30,17 +30,6 @@ I hope, that some of you can take some ideas or implementation details and use i
 
 Most likely, I will use some parts of my own projects in later ones myself. Always good, to have some references.
 
-## Some more Screenshots
-
-A little further back:
-![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/final_energy_sphere2.png "a colored heightmap terrain with an energy dome")
-
-Visible LOD (level of detail) on the mesh:
-![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/terrain_distance_based_lod.png "LOD")
-
-How it looked at some point before:
-![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/energy_sphere_multisampled.png "before color adjustments")
-
 ## How to run it:
 
 To run this demo, you only need **Golang** installed on your system. And a graphics card, that supports **OpenGL 4.3**.
@@ -48,3 +37,20 @@ To run this demo, you only need **Golang** installed on your system. And a graph
 On linux, you can just run the *compile.sh* file in the main folder.
 
 On Windows, you have to copy the command from the *compile.sh* and run it directly.
+
+## Some more Screenshots
+
+A little further back:
+![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/final_energy_sphere2.png "a colored heightmap terrain with an energy dome")
+
+Another side view:
+![Energy dome](https://github.com/MauriceGit/Energy-Dome_Terrain/blob/master/Screenshots/side_view.png "side view closeup")
+
+Visible LOD (level of detail) on the mesh:
+![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/terrain_distance_based_lod.png "LOD")
+
+How it looked at some point before:
+![Energy dome](https://github.com/MauriceGit/RealHeightmapTerrain/blob/master/Screenshots/energy_sphere_multisampled.png "before color adjustments")
+
+Inside the dome, looking up:
+![Energy dome](https://github.com/MauriceGit/Energy-Dome_Terrain/blob/master/Screenshots/energy_from_inside.png "from inside the dome, looking up")

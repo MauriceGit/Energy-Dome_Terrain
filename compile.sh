@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "Set the GOPATH to '$GOPATH'"
 export GOPATH=$(pwd)/Go
-echo "Set the GOBIN to '$GOBIN'"
+echo "Set the GOPATH to '$GOPATH'"
 export GOBIN=$(pwd)/bin
+echo "Set the GOBIN to '$GOBIN'"
 
 if [[ ! -d "bin" ]]
 then
